@@ -80,7 +80,10 @@ class BarChart(QWidget):
         self.setFixedHeight(58)
 
     def set_values(self, values: list[tuple[str, int]]) -> None:
-        self.values = values[-7:]
+        """固定 7 个槽位，从右往左填，早期数据少时左边留空。"""
+        tail = values[-7:]
+        pad = 7 - len(tail)
+        self.values = [("", 0)] * pad + tail
         self.update()
 
     def paintEvent(self, event) -> None:  # noqa: N802
@@ -94,15 +97,19 @@ class BarChart(QWidget):
             p.end()
             return
 
-        n = len(self.values)
+        n = 7
         gap = 8
-        bar_w = max(8.0, (self.width() - gap * (n - 1)) / n)
+        bar_w = min(30.0, max(8.0, (self.width() - gap * (n - 1)) / n))
+        total_w = n * bar_w + (n - 1) * gap
+        offset = max(0.0, (self.width() - total_w) / 2)
         peak = max((v for _, v in self.values), default=0) or 1
         base = self.height() - 6
 
         for i, (_day, v) in enumerate(self.values):
+            if v <= 0:
+                continue
             h = 3 + (base - 10) * (v / peak)
-            x = i * (bar_w + gap)
+            x = offset + i * (bar_w + gap)
             last = i == n - 1
             c = QColor(GOLD if last else ACCENT)
             c.setAlpha(235 if last else 150)

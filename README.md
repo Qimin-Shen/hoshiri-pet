@@ -1,10 +1,12 @@
 # 星璃 Hoshiri · 桌宠
 
-> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.4.0-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
+> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.4.1-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
 
 常驻桌面右下角的 AI 伙伴，绑定 DeepSeek，实时显示额度。
 
-![桌宠](docs/pet-v032.png)
+![桌宠实拍](docs/screenshot.png)
+
+*实机截图：右下角停靠、额度面板、对话气泡。*
 
 ---
 
@@ -44,8 +46,8 @@
 | 开机自启 | 右键菜单开关，写 `HKCU\...\Run` |
 
 <p>
-  <img src="docs/ui-panel-v2.png" width="300" alt="额度面板">
-  <img src="docs/ui-settings.png" width="360" alt="设置">
+  <img src="docs/ui-settings.png" width="380" alt="设置">
+  <img src="docs/ui-bubble.png" width="300" alt="气泡">
 </p>
 
 ## 快速开始
@@ -145,6 +147,7 @@ hoshiri-pet/
 
 | 版本 | 内容 |
 |---|---|
+| v0.4.1 | 近 7 天图固定槽位、README 补实机截图 |
 | v0.4.0 | 额度面板重做、输入框自动收起、主动搭话 |
 | v0.3.2 | 修复头发形变的越界崩溃 |
 | v0.3.1 | 60fps 时基、逐像素头发形变、眨眼序列帧（已下架） |
