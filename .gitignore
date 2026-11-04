@@ -1,0 +1,27 @@
+# 虚拟环境
+.venv/
+venv/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 用户配置
+config.json
+
+# 原始素材（体积大 / 版权归作者，不入库）
+assets/raw/*
+!assets/raw/.gitkeep
+
+# 大体积中间产物
+assets/out/full.png
+
+# 打包输出
+build/
+dist/
+*.spec
+
+# 编辑器
+.vscode/
+.idea/
