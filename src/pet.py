@@ -16,14 +16,14 @@ import config
 import deepseek
 import keystore
 import store
+import autostart
 from particles import ParticleField
 from ui.bubble import SpeechBubble
 from ui.chatbox import ChatInput
 from ui.panel import Dashboard
 from ui.settings import SettingsDialog
 
-ROOT = Path(__file__).resolve().parent.parent
-ASSETS = ROOT / "assets" / "out"
+from paths import ASSETS
 
 ACCENT = QColor("#A9C9F2")
 GOLD = QColor("#F0D28A")
@@ -395,6 +395,12 @@ class PetWindow(QWidget):
             a.triggered.connect(lambda _=False, n=name: self._set_asset(n))
             look_menu.addAction(a)
 
+        act_auto = QAction("开机自启", menu)
+        act_auto.setCheckable(True)
+        act_auto.setChecked(autostart.is_enabled())
+        act_auto.toggled.connect(self._toggle_autostart)
+        menu.addAction(act_auto)
+
         menu.addSeparator()
         act_quit = QAction("退出", menu)
         act_quit.triggered.connect(QApplication.quit)
@@ -424,6 +430,13 @@ class PetWindow(QWidget):
     def _toggle_particles(self, on: bool) -> None:
         self.cfg["particles"] = bool(on)
         config.save(self.cfg)
+
+    def _toggle_autostart(self, on: bool) -> None:
+        ok = autostart.enable() if on else autostart.disable()
+        if ok:
+            self.say("已开启开机自启～" if on else "已关闭开机自启～", 4000)
+        else:
+            self.say("设置开机自启失败，可能被安全软件拦了", 6000)
 
     def _set_height(self, h: int) -> None:
         self.cfg["height"] = h
@@ -478,4 +491,5 @@ class PetWindow(QWidget):
         else:
             self.show()
             self.raise_()
+
 
