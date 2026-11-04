@@ -1,4 +1,4 @@
-﻿"""合成闭眼：只去除虹膜与眼白，保留眼睑和睫毛，局部肤色修补。"""
+"""生成眨眼序列帧：10 档眼睑闭合进度（椭圆软遮罩）。"""
 
 from __future__ import annotations
 
@@ -6,10 +6,13 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 from scipy import ndimage
 
 OUT = Path(__file__).resolve().parent.parent / "assets" / "out" / "hd"
+BLINK_DIR = OUT / "blink"
+BLINK_DIR.mkdir(parents=True, exist_ok=True)
+
 base = Image.open(OUT / "base.png").convert("RGBA")
 arr = np.asarray(base).astype(np.int16)
 h, w = arr.shape[:2]
@@ -28,74 +31,79 @@ for i in np.argsort(sizes)[::-1][:2]:
     boxes.append((int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())))
 boxes.sort(key=lambda t: t[0])
 
-PAD = 6
-EYES = [(max(0, x0 - PAD), max(0, y0 - PAD), min(w, x1 + PAD), min(h, y1 + PAD)) for x0, y0, x1, y1 in boxes]
-print("eyes:", EYES)
+PAD = 9
+EYES = [(max(0, x0 - PAD), max(0, y0 - PAD), min(w, x1 + PAD), min(h, y1 + PAD))
+        for x0, y0, x1, y1 in boxes]
 
-out = np.asarray(base).copy()
+UX0 = min(e[0] for e in EYES)
+UY0 = min(e[1] for e in EYES)
+UX1 = max(e[2] for e in EYES)
+UY1 = max(e[3] for e in EYES)
+print("union box:", (UX0, UY0, UX1, UY1))
+
+CLOSE_RATIO = 0.95
 
 
-def skin_rows(patch: np.ndarray, which: str) -> np.ndarray:
-    rows = patch[:2] if which == "top" else patch[-2:]
-    return rows.reshape(-1, 4).mean(axis=0)
+def skin_color(x0: int, y0: int, x1: int, y1: int) -> np.ndarray:
+    patch = arr[min(h - 1, y1): min(h, y1 + 6), x0:x1, :3].reshape(-1, 3)
+    if patch.size == 0:
+        return np.array([252, 233, 226], np.float32)
+    return np.median(patch, axis=0).astype(np.float32)
 
 
-for (x0, y0, x1, y1) in EYES:
-    sub = arr[y0:y1, x0:x1]
-    sr, sg, sb, sa = sub[..., 0], sub[..., 1], sub[..., 2], sub[..., 3]
+def make_frame(k: float) -> Image.Image:
+    canvas = np.asarray(base).astype(np.float32).copy()
+    if k <= 0:
+        return Image.fromarray(canvas.clip(0, 255).astype(np.uint8), "RGBA")
 
-    # 眼白 + 虹膜：偏蓝，或非常亮且靠中间
-    bluish = sb > sr + 12
-    bright = (sr > 232) & (sg > 232) & (sb > 232)
-    ys, xs = np.mgrid[0: sub.shape[0], 0: sub.shape[1]]
-    center = ((xs - sub.shape[1] / 2) ** 2 / (sub.shape[1] ** 2) +
-              (ys - sub.shape[0] / 2) ** 2 / (sub.shape[0] ** 2)) < 0.30
-    mask = (bluish | (bright & center)) & (sa > 200)
+    lash = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ld = ImageDraw.Draw(lash)
 
-    mask = ndimage.binary_closing(mask, np.ones((3, 3)))
-    mask = ndimage.binary_dilation(mask, iterations=1)
-    soft = ndimage.gaussian_filter(mask.astype(np.float32), 1.6)
+    for (x0, y0, x1, y1) in EYES:
+        W, H = x1 - x0, y1 - y0
+        col = skin_color(x0, y0, x1, y1)
+        lid_y = y0 + H * CLOSE_RATIO * k
 
-    top = skin_rows(sub, "top")
-    bot = skin_rows(sub, "bot")
-    t = np.linspace(0, 1, sub.shape[0])[:, None, None]
-    fill = top.reshape(1, 1, 4) * (1 - t) + bot.reshape(1, 1, 4) * t
+        yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+        ell = (((xx - W / 2) / (W * 0.60)) ** 2 + ((yy - H / 2) / (H * 0.62)) ** 2) <= 1.0
+        ell = ndimage.gaussian_filter(ell.astype(np.float32), 2.2)
 
-    mixed = sub * (1 - soft[..., None]) + fill * soft[..., None]
-    out[y0:y1, x0:x1] = mixed
+        ramp = np.clip(((lid_y - (y0 + yy)) / 3.0) + 0.5, 0.0, 1.0)
+        alpha = (ell * ramp)[..., None]
 
-# 补一条闭眼线，避免看起来只是「没有眼睛」
-from PIL import ImageDraw, ImageFilter
+        shade = 1.0 - 0.10 * np.clip((lid_y - (y0 + yy)) / max(H, 1), 0, 1)
+        fill = col.reshape(1, 1, 3) * shade[..., None]
 
-line = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-ld = ImageDraw.Draw(line)
-for (x0, y0, x1, y1) in EYES:
-    W, H = x1 - x0, y1 - y0
-    cy = y0 + H * 0.56
-    pts = [
-        (x0 + W * 0.14, cy - H * 0.06),
-        (x0 + W * 0.35, cy + H * 0.10),
-        (x0 + W * 0.65, cy + H * 0.10),
-        (x0 + W * 0.86, cy - H * 0.06),
-    ]
-    ld.line(pts, fill=(122, 84, 70, 210), width=2, joint="curve")
-line = line.filter(ImageFilter.GaussianBlur(0.7))
-line_arr = np.asarray(line).astype(np.float32)
-out = out.astype(np.float32)
-la = line_arr[..., 3:4] / 255.0
-out[..., :3] = out[..., :3] * (1 - la) + line_arr[..., :3] * la
-out = out.clip(0, 255)
+        sub = canvas[y0:y1, x0:x1, :3]
+        canvas[y0:y1, x0:x1, :3] = sub * (1 - alpha) + fill * alpha
 
-closed = np.dstack([out[..., :3], arr[..., 3]]).clip(0, 255).astype(np.uint8)
-Image.fromarray(closed, "RGBA").save(OUT / "eyes_closed.png")
+        bend = H * 0.06
+        ld.line(
+            [(x0 + W * 0.12, lid_y - bend), (x0 + W * 0.5, lid_y + bend), (x0 + W * 0.88, lid_y - bend)],
+            fill=(116, 78, 64, int(50 + 160 * k)),
+            width=max(2, int(2 + 1.6 * k)),
+            joint="curve",
+        )
 
-# 预览
-comp = Image.alpha_composite(base, Image.open(OUT / "eyes_closed.png").convert("RGBA"))
-box = (620, 270, 800, 380)
-comp.crop(box).resize(((box[2] - box[0]) * 3, (box[3] - box[1]) * 3), Image.LANCZOS).save(
-    OUT / "_iris_fill.png"
+    lash = lash.filter(ImageFilter.GaussianBlur(0.6))
+    img = Image.fromarray(canvas.clip(0, 255).astype(np.uint8), "RGBA")
+    return Image.alpha_composite(img, lash)
+
+
+LEVELS = [round(i / 10, 1) for i in range(1, 11)]
+for k in LEVELS:
+    make_frame(k).crop((UX0, UY0, UX1, UY1)).save(BLINK_DIR / f"p{int(k*10):02d}.png")
+
+tiles = [make_frame(k).crop((UX0, UY0, UX1, UY1)) for k in [0.0] + LEVELS]
+tw, th = tiles[0].size
+strip = Image.new("RGBA", (tw * len(tiles), th), (26, 32, 50, 255))
+for i, t in enumerate(tiles):
+    strip.alpha_composite(t, (i * tw, 0))
+strip.save(OUT / "_blink_strip.png")
+
+json.dump(
+    {"box": [UX0, UY0, UX1, UY1], "levels": LEVELS, "size": [w, h]},
+    open(BLINK_DIR / "blink.json", "w"),
+    indent=2,
 )
-
-json.dump({"eyes": EYES, "size": [w, h]}, open(OUT / "eyes.json", "w"), indent=2)
-print("saved")
-
+print("saved", len(LEVELS), "frames ->", BLINK_DIR)

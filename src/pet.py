@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import atexit
+import ctypes
 import math
 import random
 import threading
@@ -9,7 +11,17 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QPoint, QPointF, QRect, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import (
+    QElapsedTimer,
+    QObject,
+    QPoint,
+    QPointF,
+    QRect,
+    QRectF,
+    Qt,
+    QTimer,
+    Signal,
+)
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 
@@ -19,7 +31,7 @@ import keystore
 import store
 import autostart
 from particles import ParticleField
-from effects import Effects, paint_glow
+from effects import Effects
 from layers import Character
 from ui.bubble import SpeechBubble
 from ui.chatbox import ChatInput
@@ -28,9 +40,21 @@ from ui.settings import SettingsDialog
 
 from paths import ASSETS
 
+try:
+    _winmm = ctypes.WinDLL("winmm")       # noqa: F841
+    _winmm.timeBeginPeriod(1)
+    atexit.register(lambda: _winmm.timeEndPeriod(1))
+except OSError:
+    _winmm = None                          # noqa: F841
+
 ACCENT = QColor("#A9C9F2")
 GOLD = QColor("#F0D28A")
 MAX_HISTORY = 10
+
+
+def _smoothstep(x: float) -> float:
+    x = max(0.0, min(1.0, x))
+    return x * x * (3 - 2 * x)
 
 
 class ChatSignals(QObject):
@@ -65,12 +89,15 @@ class PetWindow(QWidget):
         self._char = Character(ASSETS / "hd")
         self._effects = Effects()
 
-        self._t0 = time.time()
+        self._clock = QElapsedTimer()
+        self._clock.start()
+        self._last_tick = 0.0
+        self._anim = 0.0
+        self._blink_started = -1.0
+        self._next_blink = 2.5
         self._drag_offset: QPoint | None = None
         self._drag_vx = 0.0
         self._drag_inertia = 0.0
-        self._blink_until = 0.0
-        self._next_blink = time.time() + 3.0
         self._busy = False
         self._stream = ""
         self._history: list[dict] = []
@@ -89,8 +116,9 @@ class PetWindow(QWidget):
         self.dashboard.settings_requested.connect(self.open_settings)
 
         self._timer = QTimer(self)
+        self._timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._timer.timeout.connect(self._on_tick)
-        self._timer.start(33)
+        self._timer.start(16)
 
         self._balance_timer = QTimer(self)
         self._balance_timer.timeout.connect(lambda: self.refresh_balance())
@@ -175,31 +203,53 @@ class PetWindow(QWidget):
 
     # ---------- 绘制 ----------
 
+    BLINK_CLOSE = 0.075
+    BLINK_HOLD = 0.055
+    BLINK_OPEN = 0.130
+
     def _on_tick(self) -> None:
-        now = time.time()
+        now = self._clock.elapsed() / 1000.0
+        dt = now - self._last_tick
+        self._last_tick = now
+        if dt <= 0:
+            return
+        dt = min(dt, 0.1)          # 系统休眠后不要跳跃
+        self._anim += dt
+
         if self.cfg["particles"]:
             self._particles.tick()
-        self._effects.tick(0.033)
+        self._effects.tick(dt)
 
-        # 眨眼调度
-        if now >= self._next_blink:
-            self._blink_until = now + random.uniform(0.09, 0.14)
-            gap = random.uniform(2.4, 6.5)
-            if random.random() < 0.18:      # 偶尔连眨两下
-                self._next_blink = now + 0.35
-            else:
-                self._next_blink = now + gap
+        if self._blink_started < 0 and self._anim >= self._next_blink:
+            self._blink_started = self._anim
+            gap = random.uniform(2.6, 6.8)
+            self._next_blink = self._anim + self.BLINK_CLOSE + self.BLINK_HOLD + self.BLINK_OPEN + gap
 
-        # 拖拽惯性衰减
         self._drag_inertia *= 0.90
         self.update()
+
+    def _blink_progress(self) -> float:
+        """0=睁开，1=闭合。闭合快、张开慢。"""
+        if self._blink_started < 0:
+            return 0.0
+        e = self._anim - self._blink_started
+        if e < self.BLINK_CLOSE:
+            return _smoothstep(e / self.BLINK_CLOSE)
+        e -= self.BLINK_CLOSE
+        if e < self.BLINK_HOLD:
+            return 1.0
+        e -= self.BLINK_HOLD
+        if e < self.BLINK_OPEN:
+            return 1.0 - _smoothstep(e / self.BLINK_OPEN)
+        self._blink_started = -1.0
+        return 0.0
 
     def paintEvent(self, event) -> None:  # noqa: N802
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
-        t = time.time() - self._t0
+        t = self._anim
         bob = math.sin(t * 1.6) * 2.4
         breathe = 1.0 + 0.006 * math.sin(t * 1.15)
         tilt = 0.7 * math.sin(t * 0.85)
@@ -207,10 +257,7 @@ class PetWindow(QWidget):
         w, h = self._content
         cx = self.width() / 2
         bottom = self.height() - self.MARGIN_BOTTOM + bob
-        blink = time.time() < self._blink_until
-
-        # 背后柔光：随呼吸脉动
-        paint_glow(p, cx, bottom - h * 0.55, w * 0.60, math.sin(t * 1.15))
+        blink = self._blink_progress()
 
         p.save()
         p.translate(cx, bottom)

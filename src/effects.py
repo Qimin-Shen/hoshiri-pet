@@ -98,8 +98,10 @@ def paint_glow(p: QPainter, cx: float, cy: float, radius: float, pulse: float) -
     """角色背后的柔光，随呼吸脉动。"""
     r = radius * (0.94 + 0.08 * pulse)
     grad = QRadialGradient(QPointF(cx, cy), r)
-    grad.setColorAt(0.0, QColor(150, 190, 255, 46))
-    grad.setColorAt(0.55, QColor(140, 180, 245, 20))
+    grad.setColorAt(0.0, QColor(160, 200, 255, 20))
+    grad.setColorAt(0.35, QColor(150, 190, 250, 12))
+    grad.setColorAt(0.65, QColor(145, 185, 248, 5))
+    grad.setColorAt(0.85, QColor(140, 180, 245, 1))
     grad.setColorAt(1.0, QColor(140, 180, 245, 0))
     p.setPen(NO_PEN)
     p.setBrush(grad)
