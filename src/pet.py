@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QPoint, QPointF, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QPoint, QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 
@@ -128,10 +128,21 @@ class PetWindow(QWidget):
 
     def _place_initial(self) -> None:
         pos = self.cfg.get("pos")
-        if pos and len(pos) == 2:
+        if pos and len(pos) == 2 and self._pos_on_screen(int(pos[0]), int(pos[1])):
             self.move(int(pos[0]), int(pos[1]))
         else:
+            # 换了分辨率或拔了显示器，旧坐标可能落在屏幕外
             self.dock_bottom_right()
+
+    def _pos_on_screen(self, x: int, y: int) -> bool:
+        rect = QRect(x, y, self.width(), self.height())
+        for screen in QApplication.screens():
+            avail = screen.availableGeometry()
+            overlap = avail.intersected(rect)
+            # 至少露三分之一，否则算丢出屏幕
+            if overlap.width() * overlap.height() > self.width() * self.height() // 3:
+                return True
+        return False
 
     def dock_bottom_right(self) -> None:
         screen = QApplication.primaryScreen().availableGeometry()
@@ -512,6 +523,7 @@ class PetWindow(QWidget):
         else:
             self.show()
             self.raise_()
+
 
 
 
