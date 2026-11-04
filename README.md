@@ -1,6 +1,6 @@
 # 星璃 Hoshiri · 桌宠
 
-> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.2.0-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
+> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.3.0-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
 
 常驻桌面右下角的 AI 伙伴，绑定 DeepSeek，实时显示额度。
 
@@ -12,6 +12,9 @@
 |---|---|
 | 形象 | 立绘自动抠图，贴在任务栏上沿，像从屏幕后面探出上半身 |
 | 待机动画 | 呼吸起伏、轻微摇摆、星屑粒子（四角星 / 月牙 / 光点） |
+| 头发摆动 | 长发逐行错位流动，拖拽时有惯性甩动 |
+| 眨眼 | 2.4–6.5 秒随机一次，偶尔连眨两下 |
+| 特效 | 呼吸光晕、点击星屑爆散、拖拽拖尾、思考跳动点 |
 | 交互 | 拖拽移动、位置记忆、双击聊天、右键菜单、系统托盘 |
 | 对话 | DeepSeek 流式输出，气泡逐字显示，带上下文（最近 10 轮） |
 | 额度 | 仪表盘：余额、今日花费、今日 tokens、累计 tokens、近 7 天柱状图 |

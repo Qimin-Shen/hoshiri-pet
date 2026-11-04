@@ -25,3 +25,6 @@ dist/
 # 编辑器
 .vscode/
 .idea/
+
+# 调试中间图
+assets/out/hd/_*.png

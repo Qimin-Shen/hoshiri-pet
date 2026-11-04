@@ -1,14 +1,15 @@
-"""桌宠主窗口：透明置顶、贴边停靠、对话与额度面板。"""
+﻿"""桌宠主窗口：透明置顶、贴边停靠、对话与额度面板。"""
 
 from __future__ import annotations
 
 import math
+import random
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QPoint, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 
@@ -18,6 +19,8 @@ import keystore
 import store
 import autostart
 from particles import ParticleField
+from effects import Effects, paint_glow
+from layers import Character
 from ui.bubble import SpeechBubble
 from ui.chatbox import ChatInput
 from ui.panel import Dashboard
@@ -59,13 +62,15 @@ class PetWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setWindowTitle("星璃 Hoshiri")
 
-        self._asset_name = self.cfg.get("asset", "pet_edge_42")
-        self._source = QPixmap(str(ASSETS / f"{self._asset_name}.png"))
-        if self._source.isNull():
-            raise SystemExit(f"找不到 assets/out/{self._asset_name}.png，先运行 tools/build_assets.py")
+        self._char = Character(ASSETS / "hd")
+        self._effects = Effects()
 
         self._t0 = time.time()
         self._drag_offset: QPoint | None = None
+        self._drag_vx = 0.0
+        self._drag_inertia = 0.0
+        self._blink_until = 0.0
+        self._next_blink = time.time() + 3.0
         self._busy = False
         self._stream = ""
         self._history: list[dict] = []
@@ -111,7 +116,8 @@ class PetWindow(QWidget):
 
     def _scaled_size(self) -> tuple[int, int]:
         h = int(self.cfg["height"])
-        w = int(self._source.width() * h / self._source.height())
+        cw, ch = self._char.size()
+        w = int(cw * h / ch)
         return w, h
 
     def _relayout(self) -> None:
@@ -159,8 +165,22 @@ class PetWindow(QWidget):
     # ---------- 绘制 ----------
 
     def _on_tick(self) -> None:
+        now = time.time()
         if self.cfg["particles"]:
             self._particles.tick()
+        self._effects.tick(0.033)
+
+        # 眨眼调度
+        if now >= self._next_blink:
+            self._blink_until = now + random.uniform(0.09, 0.14)
+            gap = random.uniform(2.4, 6.5)
+            if random.random() < 0.18:      # 偶尔连眨两下
+                self._next_blink = now + 0.35
+            else:
+                self._next_blink = now + gap
+
+        # 拖拽惯性衰减
+        self._drag_inertia *= 0.90
         self.update()
 
     def paintEvent(self, event) -> None:  # noqa: N802
@@ -176,23 +196,42 @@ class PetWindow(QWidget):
         w, h = self._content
         cx = self.width() / 2
         bottom = self.height() - self.MARGIN_BOTTOM + bob
+        blink = time.time() < self._blink_until
+
+        # 背后柔光：随呼吸脉动
+        paint_glow(p, cx, bottom - h * 0.55, w * 0.60, math.sin(t * 1.15))
 
         p.save()
         p.translate(cx, bottom)
         p.rotate(tilt)
         p.scale(breathe, breathe)
-        p.drawPixmap(QRectF(-w / 2, -h, w, h), self._source, QRectF(self._source.rect()))
+        self._char.draw(p, QRectF(-w / 2, -h, w, h), t, blink, self._drag_inertia)
         p.restore()
 
-        glow = QRectF(cx - w * 0.42, bottom - 16, w * 0.84, 22)
+        # 落地阴影
+        shadow = QRectF(cx - w * 0.40, bottom - 14, w * 0.80, 20)
         p.setPen(Qt.PenStyle.NoPen)
         for i in range(6):
             p.setBrush(QColor(120, 170, 240, 20 - i * 3))
-            p.drawEllipse(glow.adjusted(i * 3, i * 1.5, -i * 3, -i * 1.5))
+            p.drawEllipse(shadow.adjusted(i * 3, i * 1.5, -i * 3, -i * 1.5))
 
         if self.cfg["particles"]:
             self._particles.paint(p, ACCENT, GOLD)
+        self._effects.paint(p)
+
+        if self._busy:
+            self._paint_thinking(p, cx, bottom - h - 18, t)
         p.end()
+
+    def _paint_thinking(self, p: QPainter, cx: float, y: float, t: float) -> None:
+        """思考中：头顶三个跳动的点。"""
+        p.setPen(Qt.PenStyle.NoPen)
+        for i in range(3):
+            phase = t * 4.2 - i * 0.55
+            lift = max(0.0, math.sin(phase)) * 5
+            alpha = 120 + int(100 * max(0.0, math.sin(phase)))
+            p.setBrush(QColor(140, 185, 245, alpha))
+            p.drawEllipse(QPointF(cx - 14 + i * 14, y - lift), 2.6, 2.6)
 
     # ---------- 对话 ----------
 
@@ -324,12 +363,18 @@ class PetWindow(QWidget):
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position()
+            self._effects.burst(pos.x(), pos.y())
             self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event) -> None:  # noqa: N802
         if self._drag_offset is not None and event.buttons() & Qt.MouseButton.LeftButton:
-            self.move(event.globalPosition().toPoint() - self._drag_offset)
+            new_pos = event.globalPosition().toPoint() - self._drag_offset
+            dx = new_pos.x() - self.x()
+            self._drag_inertia = max(-20.0, min(20.0, self._drag_inertia + dx * 0.5))
+            self._effects.trail(event.position().x(), event.position().y(), dx)
+            self.move(new_pos)
             event.accept()
 
     def mouseReleaseEvent(self, event) -> None:  # noqa: N802
@@ -382,19 +427,6 @@ class PetWindow(QWidget):
             a.triggered.connect(lambda _=False, hh=h: self._set_height(hh))
             size_menu.addAction(a)
 
-        look_menu = menu.addMenu("形象")
-        for label, name in (
-            ("露肩（最矮）", "pet_edge_42"),
-            ("半身", "pet_edge_50"),
-            ("到裙摆（最高）", "pet_edge_58"),
-            ("全身站姿", "full"),
-        ):
-            a = QAction(label, look_menu)
-            a.setCheckable(True)
-            a.setChecked(self._asset_name == name)
-            a.triggered.connect(lambda _=False, n=name: self._set_asset(n))
-            look_menu.addAction(a)
-
         act_auto = QAction("开机自启", menu)
         act_auto.setCheckable(True)
         act_auto.setChecked(autostart.is_enabled())
@@ -443,17 +475,6 @@ class PetWindow(QWidget):
         self._relayout()
         self._reset_position()
 
-    def _set_asset(self, name: str) -> None:
-        pm = QPixmap(str(ASSETS / f"{name}.png"))
-        if pm.isNull():
-            self.say(f"缺少素材 {name}.png")
-            return
-        self._source = pm
-        self._asset_name = name
-        self.cfg["asset"] = name
-        self._relayout()
-        self._reset_position()
-
     # ---------- 托盘 ----------
 
     def _build_tray(self) -> QSystemTrayIcon:
@@ -491,5 +512,6 @@ class PetWindow(QWidget):
         else:
             self.show()
             self.raise_()
+
 
 
