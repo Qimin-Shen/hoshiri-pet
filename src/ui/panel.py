@@ -1,31 +1,83 @@
-﻿"""额度仪表盘：余额 / 今日 / 累计 + 近 7 天柱状图。"""
+"""额度面板：毛玻璃卡片 + 余额环 + 指标 + 近 7 天柱状图。"""
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
+from PySide6.QtCore import (
+    QEasingCurve,
+    QPoint,
+    QRectF,
+    Qt,
+    QVariantAnimation,
+    Signal,
 )
+from PySide6.QtGui import QColor, QConicalGradient, QFont, QPainter, QPen
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
-CARD_W = 286
+CARD_W = 300
 INK = "#2B4C8C"
 MUTED = "#7C99BC"
 ACCENT = "#2B6FD6"
 GOLD = "#D9AE55"
-BORDER = QColor(169, 201, 242, 235)
-FILL = QColor(255, 255, 255, 246)
+TRACK = QColor(226, 236, 249)
+BORDER = QColor(150, 186, 235, 120)
+FILL = QColor(255, 255, 255, 240)
+
+
+class Ring(QWidget):
+    """余额余量环。"""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(78, 78)
+        self._shown = 0.0
+
+        self._anim = QVariantAnimation(self)
+        self._anim.setDuration(520)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.valueChanged.connect(self._on_value)
+
+    def _on_value(self, v) -> None:
+        self._shown = float(v)
+        self.update()
+
+    def set_ratio(self, ratio: float) -> None:
+        ratio = max(0.0, min(1.0, ratio))
+        self._anim.stop()
+        self._anim.setStartValue(self._shown)
+        self._anim.setEndValue(ratio)
+        self._anim.start()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        rect = QRectF(7, 7, self.width() - 14, self.height() - 14)
+
+        pen = QPen(TRACK, 7)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(pen)
+        p.drawArc(rect, 0, 360 * 16)
+
+        if self._shown > 0.001:
+            grad = QConicalGradient(rect.center(), 90)
+            grad.setColorAt(0.0, QColor(ACCENT))
+            grad.setColorAt(0.55, QColor("#6FA8F0"))
+            grad.setColorAt(1.0, QColor(GOLD))
+            pen = QPen(grad, 7)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            p.setPen(pen)
+            p.drawArc(rect, 90 * 16, -int(360 * 16 * self._shown))
+
+        p.setPen(QColor(INK))
+        p.setFont(QFont("Microsoft YaHei UI", 11, QFont.Weight.DemiBold))
+        p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, f"{int(self._shown * 100)}%")
+        p.end()
 
 
 class BarChart(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.values: list[tuple[str, int]] = []
-        self.setFixedHeight(46)
+        self.setFixedHeight(58)
 
     def set_values(self, values: list[tuple[str, int]]) -> None:
         self.values = values[-7:]
@@ -34,6 +86,7 @@ class BarChart(QWidget):
     def paintEvent(self, event) -> None:  # noqa: N802
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
         if not self.values:
             p.setPen(QColor(MUTED))
             p.setFont(QFont("Microsoft YaHei UI", 8))
@@ -42,23 +95,28 @@ class BarChart(QWidget):
             return
 
         n = len(self.values)
-        gap = 6
+        gap = 8
         bar_w = max(8.0, (self.width() - gap * (n - 1)) / n)
         peak = max((v for _, v in self.values), default=0) or 1
-        base = self.height() - 12
+        base = self.height() - 6
 
         for i, (_day, v) in enumerate(self.values):
-            h = 2 + (base - 6) * (v / peak)
+            h = 3 + (base - 10) * (v / peak)
             x = i * (bar_w + gap)
-            color = QColor(ACCENT) if v else QColor(210, 226, 245)
-            color.setAlpha(220)
+            last = i == n - 1
+            c = QColor(GOLD if last else ACCENT)
+            c.setAlpha(235 if last else 150)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(color)
-            p.drawRoundedRect(int(x), int(base - h), int(bar_w), int(h), 3, 3)
+            p.setBrush(c)
+            p.drawRoundedRect(QRectF(x, base - h, bar_w, h), 4, 4)
 
         p.setPen(QColor(MUTED))
         p.setFont(QFont("Microsoft YaHei UI", 7))
-        p.drawText(self.rect().adjusted(0, 0, 0, -2), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom, "近 7 天")
+        p.drawText(
+            self.rect(),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            "近 7 天",
+        )
         p.end()
 
 
@@ -79,62 +137,83 @@ class Dashboard(QWidget):
         self.setFixedWidth(CARD_W)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(18, 14, 18, 14)
-        root.setSpacing(6)
+        root.setContentsMargins(20, 16, 20, 16)
+        root.setSpacing(10)
 
-        title = QLabel("星璃 · 额度")
-        title.setFont(QFont("Microsoft YaHei UI", 9, QFont.Weight.Medium))
-        title.setStyleSheet(f"color:{MUTED}; background:transparent;")
-        root.addWidget(title)
-
-        self.balance = QLabel("--")
-        self.balance.setFont(QFont("Microsoft YaHei UI", 26, QFont.Weight.DemiBold))
-        self.balance.setStyleSheet(f"color:{INK}; background:transparent;")
-        root.addWidget(self.balance)
-
+        head = QHBoxLayout()
+        head.setSpacing(6)
+        self.dot = QLabel("●")
+        self.dot.setStyleSheet(f"color:{ACCENT}; font-size:9px; background:transparent;")
         self.state = QLabel("未绑定 API Key")
         self.state.setFont(QFont("Microsoft YaHei UI", 8))
         self.state.setStyleSheet(f"color:{MUTED}; background:transparent;")
-        root.addWidget(self.state)
+        head.addWidget(self.dot)
+        head.addWidget(self.state)
+        head.addStretch(1)
+        self.updated = QLabel("")
+        self.updated.setFont(QFont("Microsoft YaHei UI", 8))
+        self.updated.setStyleSheet(f"color:{MUTED}; background:transparent;")
+        head.addWidget(self.updated)
+        root.addLayout(head)
 
-        root.addSpacing(4)
+        body = QHBoxLayout()
+        body.setSpacing(8)
+        left = QVBoxLayout()
+        left.setSpacing(0)
+        self.balance = QLabel("--")
+        self.balance.setFont(QFont("Microsoft YaHei UI", 27, QFont.Weight.DemiBold))
+        self.balance.setStyleSheet(f"color:{INK}; background:transparent;")
+        left.addWidget(self.balance)
+        cap = QLabel("DeepSeek 余额")
+        cap.setFont(QFont("Microsoft YaHei UI", 8))
+        cap.setStyleSheet(f"color:{MUTED}; background:transparent;")
+        left.addWidget(cap)
+        body.addLayout(left)
+        body.addStretch(1)
+        self.ring = Ring(self)
+        body.addWidget(self.ring)
+        root.addLayout(body)
+
+        root.addWidget(self._line())
+
         self.today_cost = self._stat_row(root, "今日花费")
         self.today_tokens = self._stat_row(root, "今日 tokens")
         self.total_tokens = self._stat_row(root, "累计 tokens")
 
-        root.addSpacing(6)
+        root.addWidget(self._line())
+
         self.chart = BarChart(self)
         root.addWidget(self.chart)
 
         bottom = QHBoxLayout()
-        bottom.setContentsMargins(0, 4, 0, 0)
-        self.updated = QLabel("")
-        self.updated.setFont(QFont("Microsoft YaHei UI", 8))
-        self.updated.setStyleSheet(f"color:{MUTED}; background:transparent;")
-        bottom.addWidget(self.updated)
+        bottom.setContentsMargins(0, 2, 0, 0)
         bottom.addStretch(1)
-
         btn_style = (
-            "QPushButton{background:transparent;border:none;color:%s;"
-            "font-size:11px;padding:2px 4px;}"
+            "QPushButton{background:transparent;border:none;color:%s;font-size:11px;"
+            "padding:3px 6px;}"
             "QPushButton:hover{color:%s;}"
         ) % (ACCENT, GOLD)
+
+        self.btn_settings = QPushButton("设置")
+        self.btn_settings.setStyleSheet(btn_style)
+        self.btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_settings.clicked.connect(self.settings_requested)
+        bottom.addWidget(self.btn_settings)
 
         btn_refresh = QPushButton("刷新")
         btn_refresh.setStyleSheet(btn_style)
         btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_refresh.clicked.connect(self.refresh_requested)
         bottom.addWidget(btn_refresh)
-
-        btn_settings = QPushButton("设置")
-        btn_settings.setStyleSheet(btn_style)
-        btn_settings.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_settings.clicked.connect(self.settings_requested)
-        bottom.addWidget(btn_settings)
-
         root.addLayout(bottom)
 
         self.hide()
+
+    def _line(self) -> QWidget:
+        line = QWidget(self)
+        line.setFixedHeight(1)
+        line.setStyleSheet("background:rgba(160,192,235,60);")
+        return line
 
     def _stat_row(self, layout: QVBoxLayout, label: str) -> QLabel:
         row = QHBoxLayout()
@@ -163,20 +242,28 @@ class Dashboard(QWidget):
         total_tokens: int,
         history: list[tuple[str, int]],
         updated_at: str,
+        reference: float | None = None,
     ) -> None:
         if balance is None:
             self.balance.setText("--")
+            self.ring.set_ratio(0)
         else:
             symbol = "¥" if currency.upper() in ("CNY", "RMB") else "$"
             self.balance.setText(f"{symbol}{balance:,.2f}")
+            ref = reference or max(balance, 1.0)
+            self.ring.set_ratio(balance / ref if ref else 0)
+
         self.today_cost.setText(f"¥{today_cost:.2f}")
         self.today_tokens.setText(f"{today_tokens:,}")
         self.total_tokens.setText(f"{total_tokens:,}")
         self.chart.set_values(history)
         self.updated.setText(updated_at)
 
-    def set_state(self, text: str) -> None:
+    def set_state(self, text: str, ok: bool = True) -> None:
         self.state.setText(text)
+        self.dot.setStyleSheet(
+            f"color:{ACCENT if ok else '#C0392B'}; font-size:9px; background:transparent;"
+        )
 
     # ---------- 位置 ----------
 
@@ -201,8 +288,13 @@ class Dashboard(QWidget):
     def paintEvent(self, event) -> None:  # noqa: N802
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        rect = QRectF(self.rect()).adjusted(1.5, 1.5, -1.5, -1.5)
+
         p.setPen(QPen(BORDER, 1.2))
         p.setBrush(FILL)
-        p.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1), 16, 16)
-        p.end()
+        p.drawRoundedRect(rect, 18, 18)
 
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(168, 200, 245, 26))
+        p.drawRoundedRect(QRectF(rect.left(), rect.top(), rect.width(), 56), 18, 18)
+        p.end()

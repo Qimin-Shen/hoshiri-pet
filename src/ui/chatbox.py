@@ -1,10 +1,12 @@
-"""输入框：双击桌宠后浮出，Enter 发送，Esc 收起。"""
+"""输入框：平时收起，双击/菜单唤出，发送或失焦自动隐藏。"""
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtCore import QEvent, QPoint, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QLineEdit, QWidget
+
+IDLE_HIDE_MS = 8000
 
 
 class _Edit(QLineEdit):
@@ -44,14 +46,47 @@ class ChatInput(QWidget):
         self.edit.setGeometry(6, 4, self.WIDTH - 12, self.HEIGHT - 8)
         self.edit.returnPressed.connect(self._submit)
         self.edit.escaped.connect(self.hide)
+        self.edit.textEdited.connect(lambda _: self._touch())
+        self.edit.installEventFilter(self)
+
+        self._idle = QTimer(self)
+        self._idle.setSingleShot(True)
+        self._idle.timeout.connect(self._auto_hide)
+
         self.hide()
+
+    # ---------- 显隐 ----------
+
+    def _touch(self) -> None:
+        self._idle.start(IDLE_HIDE_MS)
+
+    def _auto_hide(self) -> None:
+        if not self.edit.text().strip():
+            self.hide()
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802
+        if obj is self.edit and event.type() == QEvent.Type.FocusOut:
+            # 点到别处就收起，延迟一点避免自己点击时闪烁
+            QTimer.singleShot(150, self._hide_if_idle)
+        return super().eventFilter(obj, event)
+
+    def _hide_if_idle(self) -> None:
+        if not self.isActiveWindow() and not self.edit.hasFocus():
+            self.hide()
 
     def _submit(self) -> None:
         text = self.edit.text().strip()
         if not text:
             return
         self.edit.clear()
+        self.hide()
         self.submitted.emit(text)
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        self._idle.stop()
+        super().hideEvent(event)
+
+    # ---------- 位置 ----------
 
     def open_at(self, anchor: QWidget) -> None:
         geo = anchor.frameGeometry()
@@ -64,6 +99,7 @@ class ChatInput(QWidget):
         self.raise_()
         self.activateWindow()
         self.edit.setFocus(Qt.FocusReason.OtherFocusReason)
+        self._touch()
 
     def follow(self, anchor: QWidget) -> None:
         if self.isVisible():

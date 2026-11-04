@@ -107,3 +107,13 @@ def history(days: int = 7) -> list[tuple[str, int]]:
             (start,),
         ).fetchall()
     return [(r[0], int(r[1] or 0)) for r in rows]
+
+
+def balance_peak(days: int = 30) -> float | None:
+    """近 N 天的最高余额，用来算「余量环」的比例。"""
+    start = (datetime.now() - timedelta(days=days)).isoformat(timespec="seconds")
+    with _conn() as c:
+        row = c.execute(
+            "SELECT MAX(total) FROM balance WHERE ts >= ?", (start,)
+        ).fetchone()
+    return float(row[0]) if row and row[0] is not None else None

@@ -25,6 +25,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 
+import chatter
 import config
 import deepseek
 import keystore
@@ -99,6 +100,8 @@ class PetWindow(QWidget):
         self._drag_vx = 0.0
         self._drag_inertia = 0.0
         self._busy = False
+        self._chatter = chatter.Chatter()
+        self._last_user_chat = time.time()
         self._stream = ""
         self._history: list[dict] = []
         self._chat_sig: ChatSignals | None = None
@@ -124,6 +127,10 @@ class PetWindow(QWidget):
         self._balance_timer.timeout.connect(lambda: self.refresh_balance())
         self._balance_timer.start(60_000)
 
+        self._chatter_timer = QTimer(self)
+        self._chatter_timer.timeout.connect(self._chatter_tick)
+        self._chatter_timer.start(45_000)
+
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
         self._hide_timer.timeout.connect(self.bubble.hide)
@@ -133,6 +140,24 @@ class PetWindow(QWidget):
         self._prime_dashboard()
         QTimer.singleShot(1500, lambda: self.refresh_balance())
         QTimer.singleShot(2600, self._greet)
+
+    def _chatter_tick(self) -> None:
+        if not self.cfg.get("chatter", True):
+            return
+        busy = (
+            self._busy
+            or self.chatbox.isVisible()
+            or (self.bubble.isVisible() and self._hide_timer.isActive())
+        )
+        balance = (self._balance or {}).get("total")
+        text = self._chatter.tick(
+            now=datetime.now(),
+            balance=balance,
+            idle_seconds=time.time() - self._last_user_chat,
+            busy=busy,
+        )
+        if text:
+            self.say(text, 9_000)
 
     def _greet(self) -> None:
         if not keystore.get_key():
@@ -311,6 +336,7 @@ class PetWindow(QWidget):
             return
 
         self._busy = True
+        self._last_user_chat = time.time()
         self._stream = ""
         self._history.append({"role": "user", "content": text})
         self.bubble.set_text("…")
@@ -415,6 +441,7 @@ class PetWindow(QWidget):
             total_tokens=store.total_tokens(),
             history=store.history(7),
             updated_at=f"更新于 {updated}" if updated else "尚无数据",
+            reference=store.balance_peak(30),
         )
 
     # ---------- 窗口行为 ----------
@@ -485,6 +512,12 @@ class PetWindow(QWidget):
             a.triggered.connect(lambda _=False, hh=h: self._set_height(hh))
             size_menu.addAction(a)
 
+        act_talk = QAction("主动搭话", menu)
+        act_talk.setCheckable(True)
+        act_talk.setChecked(bool(self.cfg.get("chatter", True)))
+        act_talk.toggled.connect(self._toggle_chatter)
+        menu.addAction(act_talk)
+
         act_auto = QAction("开机自启", menu)
         act_auto.setCheckable(True)
         act_auto.setChecked(autostart.is_enabled())
@@ -519,6 +552,10 @@ class PetWindow(QWidget):
 
     def _toggle_particles(self, on: bool) -> None:
         self.cfg["particles"] = bool(on)
+        config.save(self.cfg)
+
+    def _toggle_chatter(self, on: bool) -> None:
+        self.cfg["chatter"] = bool(on)
         config.save(self.cfg)
 
     def _toggle_autostart(self, on: bool) -> None:

@@ -16,6 +16,7 @@ DEFAULTS: dict[str, Any] = {
     "height": 300,        # 角色像素高度
     "asset": "pet_edge_42",  # 形象素材名（assets/out 下）
     "particles": True,    # 星屑特效
+    "chatter": True,      # 主动搭话
     "topmost": True,
     "opacity": 1.0,
 }
