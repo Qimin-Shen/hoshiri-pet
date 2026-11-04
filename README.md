@@ -1,6 +1,6 @@
 # 星璃 Hoshiri · 桌宠
 
-> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.3.1-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
+> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.3.2-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
 
 常驻桌面右下角的 AI 伙伴，绑定 DeepSeek，实时显示额度。
 

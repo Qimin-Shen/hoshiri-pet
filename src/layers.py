@@ -68,7 +68,9 @@ class Character:
         arr = np.frombuffer(bytes(img.constBits()), np.uint8).reshape(img.height(), bpl)
         arr = arr[:, : w * 4].reshape(h, w, 4).astype(np.float32)
 
-        self._padded = np.pad(arr, ((0, 0), (1, 1), (0, 0)))
+        # 位移最大可达 HAIR_SHIFT + 拖拽惯性，两侧留足空档，越界自然取到全透明
+        self._pad = int(HAIR_SHIFT + 40)
+        self._padded = np.pad(arr, ((0, 0), (self._pad, self._pad), (0, 0)))
         self._out = np.empty((h, w, 4), np.float32)
         self._rows = np.arange(h)[:, None]
         self._xs = np.arange(w, dtype=np.float32)[None, :]
@@ -125,7 +127,7 @@ class Character:
         xs = self._xs - dx[:, None]
         x0 = np.floor(xs)
         frac = xs - x0
-        i0 = x0.astype(np.int32) + 1      # +1 抵消 padding
+        i0 = np.clip(x0.astype(np.int32) + self._pad, 0, self._padded.shape[1] - 2)
         i1 = i0 + 1
 
         rows = self._rows
