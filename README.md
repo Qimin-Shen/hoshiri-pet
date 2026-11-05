@@ -1,6 +1,6 @@
 # 星璃 Hoshiri · 桌宠
 
-> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.4.1-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
+> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.5.0-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
 
 常驻桌面右下角的 AI 伙伴，绑定 DeepSeek，实时显示额度。
 
@@ -42,7 +42,8 @@
 | 对话 | DeepSeek 流式输出，气泡逐字显示；输入框平时收起，双击唤出，发送即隐 |
 | 主动搭话 | 按时间 / 余额 / 久坐 / 冷落自动开口，可在右键菜单关闭 |
 | 额度 | 毛玻璃面板：余额环、今日花费、今日 tokens、累计 tokens、近 7 天柱状图 |
-| 设置 | API Key 存入 Windows 凭据管理器，不落明文 |
+| 服务商 | 支持 DeepSeek / OpenAI / Anthropic，可在设置里切换并自定义 Base URL |
+| 设置 | API Key 按服务商存入 Windows 凭据管理器，不落明文 |
 | 开机自启 | 右键菜单开关，写 `HKCU\...\Run` |
 
 <p>
@@ -147,6 +148,7 @@ hoshiri-pet/
 
 | 版本 | 内容 |
 |---|---|
+| v0.5.0 | 支持 DeepSeek / OpenAI / Anthropic 三种服务商 |
 | v0.4.1 | 近 7 天图固定槽位、README 补实机截图 |
 | v0.4.0 | 额度面板重做、输入框自动收起、主动搭话 |
 | v0.3.2 | 修复头发形变的越界崩溃 |

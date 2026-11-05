@@ -43,9 +43,9 @@ class ApiClientTests(unittest.TestCase):
             ), headers={"content-type": "text/event-stream"})
 
         chunks = list(self.call_with_response(handler, lambda: api_client.stream_chat(
-            "openai", "https://bobo-work.txlrai.cn/v1", "secret", [{"role": "user", "content": "x"}], "org-model"
+            "openai", "https://api.example.com/v1", "secret", [{"role": "user", "content": "x"}], "org-model"
         )))
-        self.assertEqual(seen["url"], "https://bobo-work.txlrai.cn/v1/chat/completions")
+        self.assertEqual(seen["url"], "https://api.example.com/v1/chat/completions")
         self.assertEqual(seen["authorization"], "Bearer secret")
         self.assertEqual(seen["json"]["model"], "org-model")
         self.assertEqual(chunks[0], ("hi", None))
@@ -66,9 +66,9 @@ class ApiClientTests(unittest.TestCase):
             ), headers={"content-type": "text/event-stream"})
 
         chunks = list(self.call_with_response(handler, lambda: api_client.stream_chat(
-            "anthropic", "https://bobo-work.txlrai.cn", "secret", [{"role": "user", "content": "x"}], "org-model"
+            "anthropic", "https://api.example.com", "secret", [{"role": "user", "content": "x"}], "org-model"
         )))
-        self.assertEqual(seen["url"], "https://bobo-work.txlrai.cn/v1/messages")
+        self.assertEqual(seen["url"], "https://api.example.com/v1/messages")
         self.assertEqual(seen["key"], "secret")
         self.assertEqual(seen["version"], "2023-06-01")
         self.assertEqual(chunks[0], ("hello", None))
@@ -83,10 +83,10 @@ class ApiClientTests(unittest.TestCase):
             return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
 
         result = self.call_with_response(handler, lambda: api_client.test_connection(
-            "openai", "https://bobo-work.txlrai.cn/v1", "secret", "org-model"
+            "openai", "https://api.example.com/v1", "secret", "org-model"
         ))
         self.assertIn("OpenAI", result)
-        self.assertEqual(seen["url"], "https://bobo-work.txlrai.cn/v1/chat/completions")
+        self.assertEqual(seen["url"], "https://api.example.com/v1/chat/completions")
         self.assertEqual(seen["payload"]["model"], "org-model")
 
     def test_legacy_config_migrates_deepseek_model(self):

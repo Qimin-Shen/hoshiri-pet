@@ -12,8 +12,8 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 PROVIDER_DEFAULTS = {
     "deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-chat"},
-    "openai": {"base_url": "https://bobo-work.txlrai.cn/v1", "model": ""},
-    "anthropic": {"base_url": "https://bobo-work.txlrai.cn", "model": ""},
+    "openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini"},
+    "anthropic": {"base_url": "https://api.anthropic.com", "model": "claude-3-5-sonnet-latest"},
 }
 
 DEFAULTS: dict[str, Any] = {

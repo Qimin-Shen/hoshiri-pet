@@ -10,8 +10,8 @@ import httpx
 TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=30.0, pool=10.0)
 DEFAULT_URLS = {
     "deepseek": "https://api.deepseek.com",
-    "openai": "https://bobo-work.txlrai.cn/v1",
-    "anthropic": "https://bobo-work.txlrai.cn",
+    "openai": "https://api.openai.com/v1",
+    "anthropic": "https://api.anthropic.com",
 }
 SYSTEM_PROMPT = (
     "你是「星璃」（Hoshiri），一位住在用户桌面右下角的少女。"
