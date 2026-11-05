@@ -1,4 +1,4 @@
-﻿"""桌宠主窗口：透明置顶、贴边停靠、对话与额度面板。"""
+"""桌宠主窗口：透明置顶、贴边停靠、对话与额度面板。"""
 
 from __future__ import annotations
 
@@ -27,6 +27,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QWidget
 
 import chatter
 import config
+import api_client
 import deepseek
 import keystore
 import store
@@ -161,7 +162,7 @@ class PetWindow(QWidget):
 
     def _greet(self) -> None:
         if not keystore.get_key():
-            self.say("右键 → 设置，填上 DeepSeek 的 API Key，就能跟我聊天啦～", 12_000)
+            self.say("右键 → 设置，选择服务商并填写对应 API Key 和模型，就能聊天啦～", 12_000)
         else:
             self.say("我在呢～双击我就能聊天。", 6_000)
 
@@ -330,9 +331,10 @@ class PetWindow(QWidget):
     def send_message(self, text: str) -> None:
         if self._busy:
             return
-        key = keystore.get_key()
+        provider = self.cfg.get("provider", "deepseek")
+        key = keystore.get_key(provider)
         if not key:
-            self.say("还没绑定 API Key 哦～右键 → 设置")
+            self.say("还没绑定此服务商的 API Key 哦～右键 → 设置")
             return
 
         self._busy = True
@@ -349,13 +351,14 @@ class PetWindow(QWidget):
         self._chat_sig.error.connect(self._on_chat_error)
 
         messages = self._history[-MAX_HISTORY:]
-        model = self.cfg.get("model", deepseek.DEFAULT_MODEL)
+        model = self.cfg.get("provider_models", {}).get(provider) or self.cfg.get("model", deepseek.DEFAULT_MODEL)
+        base_url = self.cfg.get("provider_urls", {}).get(provider)
         sig = self._chat_sig
 
         def worker() -> None:
             usage: dict = {}
             try:
-                for piece, u in deepseek.stream_chat(key, messages, model):
+                for piece, u in api_client.stream_chat(provider, base_url, key, messages, model):
                     if piece:
                         sig.chunk.emit(piece)
                     if u:
@@ -376,7 +379,7 @@ class PetWindow(QWidget):
         if self._stream:
             self._history.append({"role": "assistant", "content": self._stream})
             store.add_usage(
-                self.cfg.get("model", deepseek.DEFAULT_MODEL),
+                self.cfg.get("provider_models", {}).get(self.cfg.get("provider", "deepseek")) or self.cfg.get("model", deepseek.DEFAULT_MODEL),
                 int(usage.get("prompt_tokens", 0) or 0),
                 int(usage.get("completion_tokens", 0) or 0),
             )
@@ -397,7 +400,15 @@ class PetWindow(QWidget):
         self._refresh_dashboard_values(last[0] if last else None, last[1][11:16] if last else "")
 
     def refresh_balance(self, force: bool = False) -> None:
-        key = keystore.get_key()
+        provider = self.cfg.get("provider", "deepseek")
+        if provider != "deepseek":
+            self._balance = None
+            self.dashboard.set_state("当前服务商未提供余额查询接口")
+            self._refresh_dashboard_values(None, "")
+            self.dashboard.set_balance_supported(False)
+            return
+        self.dashboard.set_balance_supported(True)
+        key = keystore.get_key(provider)
         if not key:
             self.dashboard.set_state("未绑定 API Key · 右键 → 设置")
             if force:
@@ -411,7 +422,7 @@ class PetWindow(QWidget):
 
         def worker() -> None:
             try:
-                sig.ok.emit(deepseek.balance(key))
+                sig.ok.emit(api_client.balance(key, self.cfg.get("provider_urls", {}).get("deepseek")))
             except Exception as exc:  # noqa: BLE001
                 sig.error.emit(str(exc))
 
@@ -541,6 +552,7 @@ class PetWindow(QWidget):
     def open_settings(self) -> None:
         dlg = SettingsDialog(self)
         if dlg.exec():
+            self.cfg = config.load()
             self.say("设置已保存～")
             self.refresh_balance()
 

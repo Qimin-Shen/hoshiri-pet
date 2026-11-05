@@ -171,7 +171,8 @@ class Dashboard(QWidget):
         self.balance.setFont(QFont("Microsoft YaHei UI", 27, QFont.Weight.DemiBold))
         self.balance.setStyleSheet(f"color:{INK}; background:transparent;")
         left.addWidget(self.balance)
-        cap = QLabel("DeepSeek 余额")
+        self.balance_caption = QLabel("DeepSeek 余额")
+        cap = self.balance_caption
         cap.setFont(QFont("Microsoft YaHei UI", 8))
         cap.setStyleSheet(f"color:{MUTED}; background:transparent;")
         left.addWidget(cap)
@@ -183,7 +184,7 @@ class Dashboard(QWidget):
 
         root.addWidget(self._line())
 
-        self.today_cost = self._stat_row(root, "今日花费")
+        self.today_cost = self._stat_row(root, "今日花费 (DeepSeek)")
         self.today_tokens = self._stat_row(root, "今日 tokens")
         self.total_tokens = self._stat_row(root, "累计 tokens")
 
@@ -265,6 +266,13 @@ class Dashboard(QWidget):
         self.total_tokens.setText(f"{total_tokens:,}")
         self.chart.set_values(history)
         self.updated.setText(updated_at)
+
+    def set_balance_supported(self, supported: bool) -> None:
+        self.balance_caption.setText("DeepSeek 余额" if supported else "服务商余额不可用")
+        if not supported:
+            self.balance.setText("--")
+            self.ring.set_ratio(0)
+            self.today_cost.setText("不适用")
 
     def set_state(self, text: str, ok: bool = True) -> None:
         self.state.setText(text)

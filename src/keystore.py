@@ -1,31 +1,34 @@
-"""API Key 的存取，走 Windows 凭据管理器，不落明文。"""
-
+"""API Key storage via the Windows Credential Manager, never plain config."""
 from __future__ import annotations
 
 import keyring
 from keyring.errors import KeyringError
 
 SERVICE = "HoshiriPet"
-ACCOUNT = "deepseek"
+DEFAULT_PROVIDER = "deepseek"
 
 
-def get_key() -> str:
+def _account(provider: str) -> str:
+    return "deepseek" if provider == "deepseek" else f"{provider}"
+
+
+def get_key(provider: str = DEFAULT_PROVIDER) -> str:
     try:
-        return keyring.get_password(SERVICE, ACCOUNT) or ""
+        return keyring.get_password(SERVICE, _account(provider)) or ""
     except KeyringError:
         return ""
 
 
-def set_key(value: str) -> bool:
+def set_key(value: str, provider: str = DEFAULT_PROVIDER) -> bool:
     try:
-        keyring.set_password(SERVICE, ACCOUNT, value.strip())
+        keyring.set_password(SERVICE, _account(provider), value.strip())
         return True
     except KeyringError:
         return False
 
 
-def clear_key() -> None:
+def clear_key(provider: str = DEFAULT_PROVIDER) -> None:
     try:
-        keyring.delete_password(SERVICE, ACCOUNT)
+        keyring.delete_password(SERVICE, _account(provider))
     except KeyringError:
         pass
