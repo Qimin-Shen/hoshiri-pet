@@ -20,6 +20,9 @@ Write-Host "开始打包..." -ForegroundColor Cyan
     --icon "assets\out\app.ico" `
     --add-data "assets/out;assets/out" `
     --paths src `
+    --hidden-import memory `
+    --hidden-import environment `
+    --hidden-import ui.memories `
     --exclude-module PySide6.QtWebEngineCore `
     --exclude-module PySide6.QtWebEngineWidgets `
     --exclude-module PySide6.QtWebChannel `

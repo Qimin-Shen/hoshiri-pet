@@ -1,6 +1,6 @@
 # 星璃 Hoshiri · 桌宠
 
-> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 解压 `HoshiriPet-v0.4.1-win64.zip`，双击 `HoshiriPet.exe`，无需安装 Python。
+> **下载即用**：[Releases](https://github.com/Qimin-Shen/hoshiri-pet/releases/latest) — 当前源码整合版本为 **2.2（尚未发布 Release）**；已发布安装包版本与源码版本可能不同，请以 Release 页面为准。
 
 常驻桌面右下角的 AI 伙伴，绑定 DeepSeek，实时显示额度。
 
@@ -10,45 +10,36 @@
 
 ---
 
-## ⚠️ 使用许可（请先看这一节）
+## ⚠️ 使用许可
 
-**「星璃 Hoshiri」是我的个人原创角色（OC），不是公共素材。**
-
-| | |
-|---|---|
-| ✅ **允许** | 克隆仓库、本地运行、阅读源码、提 Issue、Fork 后自己改着玩 |
-| ❌ **禁止** | 任何形式的**商业用途**——售卖、内购、广告变现、随商品分发、为商业产品导流 |
-| ❌ **禁止** | 把角色当作公司 / 产品 / 店铺的吉祥物或代言形象 |
-| ❌ **禁止** | 单独提取立绘、头像用于周边、印刷品、付费头像 |
-| ❌ **禁止** | 用于 AI 模型训练或图生图素材 |
-
-- **代码**：MIT，可自由使用
-- **角色形象（立绘、头像、以及本项目派生的所有图片素材）**：版权所有，**不适用 MIT，禁止商用**
-
-商业授权请联系作者。
-
----
+**「星璃 Hoshiri」是个人原创角色（OC），不是公共素材。**代码为 MIT；角色立绘及项目派生图片版权所有，禁止商业用途、不得用于模型训练或图生图素材。详见 `LICENSE`。
 
 ## 功能
 
 | 模块 | 说明 |
 |---|---|
 | 形象 | 立绘自动抠图，贴在任务栏上沿，像从屏幕后面探出上半身 |
-| 待机动画 | 60fps 渲染，呼吸起伏、轻微摇摆、星屑粒子 |
-| 头发摆动 | 逐像素行位移 + 整体缓摆，9.5 秒一个来回，拖拽有惯性甩动 |
-| 眨眼 | 10 档眼睑闭合序列，闭合快张开慢，2.6–6.8 秒随机一次 |
-| 特效 | 点击星屑爆散、拖拽拖尾、思考跳动点 |
+| 动画 | 60fps 待机、呼吸、头发摆动、眨眼、星屑及拖拽特效 |
 | 交互 | 拖拽移动、位置记忆、双击聊天、右键菜单、系统托盘 |
-| 对话 | DeepSeek 流式输出，气泡逐字显示；输入框平时收起，双击唤出，发送即隐 |
-| 主动搭话 | 按时间 / 余额 / 久坐 / 冷落自动开口，可在右键菜单关闭 |
-| 额度 | 毛玻璃面板：余额环、今日花费、今日 tokens、累计 tokens、近 7 天柱状图 |
-| 设置 | API Key 存入 Windows 凭据管理器，不落明文 |
-| 开机自启 | 右键菜单开关，写 `HKCU\...\Run` |
+| 对话 | DeepSeek / OpenAI 兼容 / Anthropic 流式聊天 |
+| 主动搭话 | 根据桌宠自身的直接互动信号调整节奏；含硬冷却、上限、勿扰和暂停 |
+| 角色档案 | 完整原创星璃长人设，可在设置中查看、编辑及恢复默认 |
+| 本地记忆 | 用户逐条确认后保存在本机；可搜索、编辑、删除、暂停及清空 |
+| 时间与天气 | 用户分别启用；天气采用手动城市，不读取设备定位 |
+| 额度 | 余额面板、今日花费、tokens 与近 7 天统计 |
+| 安全存储 | API Key 存于 Windows 凭据管理器 |
 
-<p>
-  <img src="docs/ui-settings.png" width="380" alt="设置">
-  <img src="docs/ui-bubble.png" width="300" alt="气泡">
-</p>
+## 版本 2.2：本地陪伴升级与官方服务商默认地址
+
+本版本合并本地 2.1 的自适应搭话、原创长人设、本机记忆、时间/天气上下文，与远端 v0.5.0 的 OpenAI / Anthropic 官方默认 API 地址变更。
+
+- 新安装时 OpenAI 默认 Base URL 为 `https://api.openai.com/v1`（模型默认 `gpt-4o-mini`）；Anthropic 默认 Base URL 为 `https://api.anthropic.com`（模型默认 `claude-3-5-sonnet-latest`）。按服务商现行账户、模型可用性和计费策略选择模型并确认 API Key。
+- 已有配置文件若保存了明确的 `provider_urls` / `provider_models` 值，这些用户值优先于默认值，更新不会擅自替换。若配置缺少对应字段，才使用程序默认值。
+- 主动搭话不提供频率档位；本地规则按桌宠内可观察到的直接互动信号自适应，设硬性间隔、次数上限、勿扰和暂停，不读取其他应用、游戏或屏幕。
+- 星璃角色档案为原创长文本，可编辑、预览和恢复默认；旧版人设短字段迁入档案附注。
+- 本机记忆只在用户确认后保存；用户可浏览、搜索、编辑、删除、暂停或清空。记忆存于本机 SQLite，不持久化完整聊天记录；相关记忆被召回时会随本轮对话发给当前选择的模型服务商。检索依赖本地词项匹配，可能漏召回或误匹配；敏感信息过滤为启发式，不保证绝对准确。
+- 时间和天气独立可选；天气仅用手动城市与 Open-Meteo，失败时不阻塞普通聊天。
+- 屏幕/游戏状态识别及语音输入/输出未实现，本版本不读取屏幕、游戏状态或麦克风。
 
 ## 快速开始
 
@@ -56,116 +47,70 @@
 run.bat
 ```
 
-首次运行会自动创建 `.venv` 并安装依赖（走清华镜像）。
+首次运行自动创建 `.venv` 并安装依赖（走清华镜像）。
 
 ## 首次配置
 
-1. 去 <https://platform.deepseek.com/api_keys> 创建 API Key
-2. 右键桌宠 → **设置…** → 粘贴 Key → 保存
-3. 双击桌宠即可聊天
+1. 去 <https://platform.deepseek.com/api_keys> 创建 API Key。
+2. 右键桌宠 → **设置…** → 选择服务商，填写对应 API Key 和模型，再保存。
+3. 双击桌宠即可聊天。
 
-> Key 存在 Windows 凭据管理器（服务名 `HoshiriPet`），配置文件和数据库里都不会出现明文。
+> API Key 存在 Windows 凭据管理器（服务名 `HoshiriPet`），不写入配置文件或用量数据库。角色档案和本轮召回记忆会随请求发送给所选模型服务商。
 
 ## 数据说明
 
-| 指标 | 来源 |
+| 数据 | 存储/来源 |
 |---|---|
-| 余额 | `GET /user/balance`，每分钟刷新 |
-| 今日花费 | 当天首末余额差值（真实扣费，不受单价变动影响） |
-| 今日 / 累计 tokens | 每次对话返回的 `usage` 累加，存本地 SQLite |
-| 余额环 | 当前余额 ÷ 近 30 天最高余额 |
+| 配置、人设、主动对话/时间/天气开关与城市 | `%APPDATA%\\HoshiriPet\\config.json` |
+| 确认的记忆与忽略的候选 | `%APPDATA%\\HoshiriPet\\usage.db` 的 SQLite 表，仅本机保存 |
+| 聊天记录 | 仅本次运行内存，不持久化；当前对话上下文随请求发送给所选模型服务商 |
+| tokens 与余额采样 | `%APPDATA%\\HoshiriPet\\usage.db` |
+| 天气 | Open-Meteo；仅在开启且填写城市后请求，30 分钟缓存 |
 
-数据文件：`%APPDATA%\HoshiriPet\usage.db`
+## 测试
 
-## 打包成 exe
+```bat
+.venv\\Scripts\\python.exe -m unittest discover -s tests -v
+```
+
+## 打包
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-产物在 `dist\HoshiriPet\`（约 160 MB，onedir，启动快）。
+产物在 `dist\\HoshiriPet\\`（onedir）。
 
 ## 开机自启
 
 右键桌宠 → **开机自启**，勾选即写入注册表，取消即删除。
 
-手动方式：
-
-```powershell
-Set-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run `
-  -Name HoshiriPet -Value '"C:\DevStack\apps\HoshiriPet\HoshiriPet.exe"'
-```
-
-## 目录
+## 项目结构
 
 ```
 hoshiri-pet/
 ├─ src/
-│  ├─ main.py        入口 + 单实例锁
-│  ├─ pet.py         主窗口：绘制、拖拽、对话调度、额度轮询
-│  ├─ layers.py      分层渲染（身体 / 头发 / 眨眼）
-│  ├─ effects.py     点击爆散、拖拽拖尾
-│  ├─ particles.py   星屑粒子
-│  ├─ chatter.py     主动搭话的规则与台词
-│  ├─ deepseek.py    API 客户端（流式对话 + 余额）
-│  ├─ store.py       本地用量 SQLite
-│  ├─ keystore.py    凭据管理器读写
-│  ├─ autostart.py   开机自启
-│  ├─ paths.py       打包/源码两种模式的资源路径
-│  ├─ config.py      配置
-│  └─ ui/
-│     ├─ bubble.py   对话气泡
-│     ├─ chatbox.py  输入框
-│     ├─ panel.py    额度面板
-│     └─ settings.py 设置对话框
-├─ tools/
-│  ├─ build_layers.py  立绘 → 分层素材
-│  ├─ build_eyes.py    眨眼序列帧
-│  ├─ make_icon.py     生成 .ico
-│  └─ measure_fps.py   重绘间隔测量
-├─ assets/raw/   原始素材（不入库）
-├─ assets/out/   处理后的素材
-├─ docs/         截图
-├─ ART-SPEC.md   角色设定与出图提示词
-└─ build.ps1     打包脚本
+│  ├─ main.py / pet.py       入口、桌宠窗口和交互调度
+│  ├─ chatter.py             自适应搭话规则
+│  ├─ config.py              配置、服务商默认值与旧人设迁移
+│  ├─ memory.py              本地记忆、候选与检索
+│  ├─ environment.py         用户启用的时间/天气上下文
+│  ├─ api_client.py          模型协议与提示词分层
+│  ├─ store.py               用量/余额的 SQLite 存储
+│  └─ ui/                    设置、记忆管理、气泡、输入框、面板
+├─ tests/                    API、版本迁移、调度与记忆测试
+├─ tools/ / docs/            构建工具与截图
+├─ ART-SPEC.md               角色美术设定
+└─ build.ps1                 打包脚本
 ```
 
-## 路线图
+## 后续规划（未实现）
 
-- [x] 透明置顶窗口 + 贴边停靠
-- [x] 呼吸 / 星屑动画
-- [x] 大小调节、托盘
-- [x] DeepSeek 流式对话
-- [x] 额度面板
-- [x] 分层渲染 + 头发摆动 + 眨眼
-- [x] 打包 exe + 开机自启
-- [x] 主动搭话
-- [ ] 拖拽挣扎、睡觉等状态动画
-- [ ] 换装 / 主题
-
-## 版本
-
-| 版本 | 内容 |
-|---|---|
-| v0.4.1 | 近 7 天图固定槽位、README 补实机截图 |
-| v0.4.0 | 额度面板重做、输入框自动收起、主动搭话 |
-| v0.3.2 | 修复头发形变的越界崩溃 |
-| v0.3.1 | 60fps 时基、逐像素头发形变、眨眼序列帧（已下架） |
-| v0.3.0 | 分层渲染、头发摆动、眨眼、特效 |
-| v0.2.0 | 打包、开机自启、DeepSeek 对话、额度仪表盘 |
-| v0.1.0 | 贴边停靠、星屑动画 |
-
-## 换电脑部署
-
-```bat
-git clone https://github.com/Qimin-Shen/hoshiri-pet.git
-cd hoshiri-pet
-run.bat
-```
-
-或直接下载 Release 里的 zip，解压双击。
+- 屏幕内容/游戏状态识别与据此对话（需另行设计并显式授权）
+- 语音输入、语音合成及连续语音对话
+- 拖拽挣扎、睡觉等状态动画；换装/主题
 
 ## 许可
 
 - **代码**：[MIT](LICENSE)
-- **角色形象**：Copyright © 2026 Qimin-Shen，保留所有权利。**禁止商业用途**，详见 [LICENSE](LICENSE) 末尾条款。
+- **角色形象**：版权所有，禁止商业用途，详见 `LICENSE`。
