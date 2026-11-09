@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import tempfile
@@ -30,6 +31,35 @@ class ConfigV21Tests(unittest.TestCase):
                 self.assertNotIn("chatter_interval", saved)
                 self.assertEqual(saved["chatter_frequency_per_minute"], 0.02)
                 self.assertIn("旧边界", saved["persona_profile"])
+
+    def test_old_builtin_persona_is_upgraded_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cfg_dir = Path(directory)
+            config_file = cfg_dir / "config.json"
+            old_default = "exact previous shipped default persona"
+            config_file.write_text(json.dumps({"persona_profile": old_default}), encoding="utf-8")
+            with patch.object(config, "CONFIG_DIR", cfg_dir), patch.object(config, "CONFIG_FILE", config_file), \
+                 patch.object(config, "LEGACY_DEFAULT_PERSONA_SHA256", hashlib.sha256(old_default.encode("utf-8")).hexdigest()):
+                upgraded = config.load()
+                self.assertEqual(upgraded["persona_profile"], config.DEFAULT_PERSONA)
+                self.assertEqual(upgraded["persona_schema_version"], config.PERSONA_SCHEMA_VERSION)
+                saved = json.loads(config_file.read_text(encoding="utf-8"))
+                self.assertEqual(saved["persona_profile"], config.DEFAULT_PERSONA)
+                self.assertEqual(saved["persona_schema_version"], config.PERSONA_SCHEMA_VERSION)
+                reopened = config.load()
+                self.assertEqual(reopened["persona_profile"], config.DEFAULT_PERSONA)
+
+    def test_custom_persona_is_never_overwritten_by_default_upgrade(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cfg_dir = Path(directory)
+            config_file = cfg_dir / "config.json"
+            custom = "我自己写的星璃档案，保持原样。"
+            config_file.write_text(json.dumps({"persona_profile": custom}), encoding="utf-8")
+            with patch.object(config, "CONFIG_DIR", cfg_dir), patch.object(config, "CONFIG_FILE", config_file):
+                loaded = config.load()
+                self.assertEqual(loaded["persona_profile"], custom)
+                saved = json.loads(config_file.read_text(encoding="utf-8"))
+                self.assertEqual(saved["persona_profile"], custom)
 
     def test_frequency_config_is_clamped_and_invalid_values_fall_back(self):
         with tempfile.TemporaryDirectory() as directory:

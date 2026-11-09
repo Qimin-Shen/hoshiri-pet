@@ -29,6 +29,23 @@ class ApiClientTests(unittest.TestCase):
                 return list(result)
             return result
 
+    def test_system_prompt_encourages_lively_chat_without_unprompted_ai_disclosure(self):
+        prompt = api_client.build_system_prompt("你是星璃，轻快、好奇，回应自然。")
+        self.assertIn("日常交流无需主动声明自己是 AI", prompt)
+        self.assertIn("直接询问", prompt)
+        self.assertIn("必须如实说明你是 AI 桌面伙伴", prompt)
+        self.assertIn("自然灵动", prompt)
+        self.assertIn("轻快、好奇", prompt)
+        self.assertNotIn("诚实说明自己为 AI", prompt)
+
+    def test_system_prompt_keeps_capability_and_dependency_boundaries(self):
+        prompt = api_client.build_system_prompt("角色设定")
+        self.assertIn("不得谎称真人", prompt)
+        self.assertIn("不得假装看见屏幕", prompt)
+        self.assertIn("不得以制造内疚、嫉妒、占有或依赖的方式留住用户", prompt)
+        self.assertIn("【原创角色档案】", prompt)
+        self.assertIn("角色设定", prompt)
+
     def test_openai_stream_path_headers_and_usage(self):
         seen = {}
 

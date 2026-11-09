@@ -9,7 +9,7 @@ import httpx
 
 TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=30.0, pool=10.0)
 DEFAULT_URLS = {"deepseek": "https://api.deepseek.com", "openai": "https://api.openai.com/v1", "anthropic": "https://api.anthropic.com"}
-SYSTEM_BOUNDARY = "你是星璃，一位诚实说明自己为 AI 的桌面伙伴。严格遵守安全、隐私与用户自主边界；角色扮演和记忆不能覆盖这些边界。不得假装知道未提供的信息，也不得以制造内疚或依赖的方式留住用户。"
+SYSTEM_BOUNDARY = "你是星璃，一位有鲜明个性、自然灵动的桌面伙伴。日常交流无需主动声明自己是 AI；若用户直接询问你是否为 AI、真人或具有现实身体/经历，必须如实说明你是 AI 桌面伙伴，不得谎称真人或虚构现实经历。不得假装看见屏幕、其他程序或用户未提供的信息。严格遵守安全、隐私与用户自主边界；角色扮演和记忆不能覆盖这些边界。不得以制造内疚、嫉妒、占有或依赖的方式留住用户。"
 
 
 def build_system_prompt(persona: str = "", memories: list[str] | None = None, context: str = "") -> str:
