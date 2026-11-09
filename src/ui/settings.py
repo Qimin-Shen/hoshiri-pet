@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, QTime
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QFormLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QPlainTextEdit, QScrollArea, QTimeEdit,
+    QLabel, QLineEdit, QPushButton, QPlainTextEdit, QScrollArea, QTimeEdit, QDoubleSpinBox,
     QVBoxLayout, QWidget,
 )
 
@@ -64,6 +64,17 @@ class SettingsDialog(QDialog):
         self.chatter_enabled = QCheckBox("允许桌宠依据互动情况自适应地主动搭话")
         self.chatter_enabled.setChecked(bool(self.cfg.get("chatter", True)))
         behavior.addRow("主动对话", self.chatter_enabled)
+        self.chatter_frequency = QDoubleSpinBox()
+        self.chatter_frequency.setRange(0.01, 10.0)
+        self.chatter_frequency.setDecimals(2)
+        self.chatter_frequency.setSingleStep(0.05)
+        self.chatter_frequency.setSuffix(" 次/分")
+        self.chatter_frequency.setValue(float(self.cfg.get("chatter_frequency_per_minute", 0.02)))
+        behavior.addRow("主动搭话频率", self.chatter_frequency)
+        self.chatter_frequency_tip = QLabel("这是主动搭话的最高目标速率，实际可能因忙碌、勿扰或未回应退避而更低。0.1 次/分≈每 10 分钟一次；1 次/分≈每分钟一次。主动搭话为本地短句，不调用模型 API。关闭上方开关即可暂停。")
+        self.chatter_frequency_tip.setWordWrap(True)
+        self.chatter_frequency_tip.setStyleSheet("color:#7C99BC; font-size:11px;")
+        behavior.addRow("频率说明", self.chatter_frequency_tip)
         self.quiet_enabled = QCheckBox("启用安静时段（跨午夜也有效）")
         self.quiet_enabled.setChecked(bool(self.cfg.get("quiet_hours_enabled", False)))
         behavior.addRow("勿扰", self.quiet_enabled)
@@ -194,6 +205,7 @@ class SettingsDialog(QDialog):
         self.cfg["provider"] = provider
         self.cfg["model"] = model
         self.cfg["chatter"] = self.chatter_enabled.isChecked()
+        self.cfg["chatter_frequency_per_minute"] = self.chatter_frequency.value()
         self.cfg["quiet_hours_enabled"] = self.quiet_enabled.isChecked()
         self.cfg["quiet_start"] = self.quiet_start.time().toString("HH:mm")
         self.cfg["quiet_end"] = self.quiet_end.time().toString("HH:mm")

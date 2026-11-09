@@ -111,7 +111,7 @@ class PetWindow(QWidget):
         self._balance_timer.start(60_000)
         self._chatter_timer = QTimer(self)
         self._chatter_timer.timeout.connect(self._chatter_tick)
-        self._chatter_timer.start(45_000)
+        self._chatter_timer.start(1_000)
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
         self._hide_timer.timeout.connect(self._on_bubble_timeout)
@@ -130,6 +130,7 @@ class PetWindow(QWidget):
             idle_seconds=time.time() - self._last_user_chat, busy=busy,
             quiet_enabled=bool(self.cfg.get("quiet_hours_enabled", False)),
             quiet_start=self.cfg.get("quiet_start", "23:00"), quiet_end=self.cfg.get("quiet_end", "08:00"),
+            frequency_per_minute=self.cfg.get("chatter_frequency_per_minute", 0.02), enabled=bool(self.cfg.get("chatter", True)),
         )
         if text:
             self._pending_proactive = True

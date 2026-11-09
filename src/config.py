@@ -88,7 +88,7 @@ DEFAULT_PERSONA = """【星璃 · 月轨上的桌面大小姐】
 
 DEFAULTS: dict[str, Any] = {
     "pos": None, "height": 300, "asset": "pet_edge_42", "particles": True,
-    "chatter": True, "topmost": True, "opacity": 1.0,
+    "chatter": True, "chatter_frequency_per_minute": 0.02, "topmost": True, "opacity": 1.0,
     "quiet_hours_enabled": False, "quiet_start": "23:00", "quiet_end": "08:00",
     "persona_profile": DEFAULT_PERSONA, "persona_migrated": False,
     "memory_enabled": True,
@@ -125,17 +125,23 @@ def load() -> dict[str, Any]:
     cfg = dict(DEFAULTS)
     cfg.update({k: v for k, v in data.items() if k in DEFAULTS and k not in {"persona_profile"}})
     cfg["persona_profile"] = _migrate_persona(data)
+    try:
+        frequency = float(data.get("chatter_frequency_per_minute", DEFAULTS["chatter_frequency_per_minute"]))
+    except (TypeError, ValueError):
+        frequency = DEFAULTS["chatter_frequency_per_minute"]
+    cfg["chatter_frequency_per_minute"] = min(10.0, max(0.01, frequency)) if frequency == frequency else DEFAULTS["chatter_frequency_per_minute"]
     cfg["persona_migrated"] = bool(data.get("persona_migrated", isinstance(data.get("persona"), dict)))
     cfg.pop("chatter_interval", None)
     cfg["provider"] = cfg["provider"] if cfg["provider"] in PROVIDER_DEFAULTS else "deepseek"
     urls = dict(DEFAULTS["provider_urls"])
     raw_urls = data.get("provider_urls", {}) if isinstance(data.get("provider_urls"), dict) else {}
-    retired_urls = {"https://bobo-work.txlrai.cn/v1", "https://bobo-work.txlrai.cn"}
-    retired_normalized = {url.rstrip("/") for url in retired_urls}
     for name in PROVIDER_DEFAULTS:
         configured = raw_urls.get(name)
-        if configured and configured.rstrip("/") not in retired_normalized:
-            urls[name] = configured
+        # Explicit user-entered endpoints always take precedence over defaults.
+        # Do not silently migrate or discard a saved URL; users may still rely
+        # on private company gateways at a formerly used relay address.
+        if isinstance(configured, str) and configured.strip():
+            urls[name] = configured.strip()
     models = dict(DEFAULTS["provider_models"])
     models.update(data.get("provider_models", {}) if isinstance(data.get("provider_models"), dict) else {})
     if "provider_models" not in data and data.get("model"):

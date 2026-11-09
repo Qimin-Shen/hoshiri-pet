@@ -1,4 +1,4 @@
-"""Rule-based proactive chat scheduling with bounded session-local adaptation."""
+"""Rule-based proactive chat scheduling with configurable local frequency."""
 from __future__ import annotations
 
 import random
@@ -17,10 +17,12 @@ LINES: dict[str, list[str]] = {
 
 
 class Chatter:
-    """Adapt between conservative bounds using only direct in-app responses."""
-    MIN_GAP = 15 * 60.0
+    """Honor configured target frequency, temporarily backing off after no response."""
+    MIN_FREQUENCY = 0.01
+    MAX_FREQUENCY = 10.0
+    MIN_GAP = 6.0
     MAX_GAP = 3 * 60 * 60.0
-    MAX_PER_HOUR = 2
+    MAX_PER_HOUR = 2  # retained for compatibility; configured frequency supersedes caps
     MAX_PER_DAY = 8
     STEP = 5 * 60.0
     RULE_GAP = {"balance_critical": 60 * 60, "balance_low": 4 * 60 * 60,
@@ -29,45 +31,61 @@ class Chatter:
 
     def __init__(self) -> None:
         self.last_spoke = 0.0
-        self.current_gap = 60 * 60.0
-        self._recent: dict[str, float] = {}
-        self._once_keys: set[str] = set()
+        self.current_gap = 60 * 60.0  # legacy adaptation metric; not a scheduler limit
         self._hour_stamps: list[float] = []
         self._day_stamps: list[float] = []
+        self._recent: dict[str, float] = {}
+        self._once_keys: set[str] = set()
         self._rule_last: dict[str, float] = {}
         self._unanswered = 0
+        self._unanswered_backoff = 0.0
         self._last_response = 0.0
 
     def on_user_response(self, now: datetime) -> None:
-        """Explicit reply to the pet: cautiously shorten future gap."""
         stamp = now.timestamp()
         if self._last_response and 0 <= stamp - self._last_response < 30 * 60:
             self.current_gap = max(self.MIN_GAP, self.current_gap - self.STEP)
+        if self._last_response and 0 <= stamp - self._last_response < 30 * 60:
+            self._unanswered_backoff = max(0.0, self._unanswered_backoff - self.STEP)
         self._last_response = stamp
         self._unanswered = 0
+        self._unanswered_backoff = 0.0
 
     def on_user_chat(self) -> None:
-        """A user-started chat is a positive signal, with bounded adaptation."""
         self.current_gap = max(self.MIN_GAP, self.current_gap - self.STEP)
         self._unanswered = 0
+        self._unanswered_backoff = 0.0
 
     def on_unanswered(self) -> None:
-        """No reply/hidden proactive bubble: back off instead of guilt-tripping."""
+        """Increase a temporary interval after an unanswered/hidden bubble."""
         self._unanswered += 1
         self.current_gap = min(self.MAX_GAP, self.current_gap + self.STEP * min(self._unanswered, 3))
+        self._unanswered_backoff = min(
+            self.MAX_GAP, self._unanswered_backoff + self.STEP * min(self._unanswered, 3)
+        )
 
     def reset_adaptation(self) -> None:
         self.current_gap = 60 * 60.0
         self._unanswered = 0
+        self._unanswered_backoff = 0.0
         self._last_response = 0.0
 
     def tick(self, now: datetime, balance: float | None, idle_seconds: float, busy: bool,
-             quiet_enabled: bool = False, quiet_start: str = "23:00", quiet_end: str = "08:00") -> str | None:
-        stamp = now.timestamp()
+             quiet_enabled: bool = False, quiet_start: str = "23:00", quiet_end: str = "08:00",
+             frequency_per_minute: float = 0.02, enabled: bool = True) -> str | None:
+        if not enabled or busy:
+            return None
+        try:
+            frequency = float(frequency_per_minute)
+        except (TypeError, ValueError):
+            frequency = 0.02
+        if frequency != frequency or frequency <= 0:
+            frequency = 0.02
+        frequency = min(self.MAX_FREQUENCY, max(self.MIN_FREQUENCY, frequency))
         if quiet_enabled and self._in_quiet_hours(now.time().replace(tzinfo=None), quiet_start, quiet_end):
             return None
-        if busy:
-            return None
+
+        stamp = now.timestamp()
         if stamp < self.last_spoke:
             self.last_spoke = 0.0
             self._hour_stamps.clear()
@@ -75,15 +93,12 @@ class Chatter:
             self._rule_last.clear()
             self._recent.clear()
             self._once_keys.clear()
-        if stamp - self.last_spoke < max(self.MIN_GAP, self.current_gap):
-            return None
-        self._hour_stamps = [s for s in self._hour_stamps if 0 <= stamp - s < 3600]
-        self._day_stamps = [s for s in self._day_stamps if 0 <= stamp - s < 86400]
-        if len(self._hour_stamps) >= self.MAX_PER_HOUR or len(self._day_stamps) >= self.MAX_PER_DAY:
+        target_gap = max(self.MIN_GAP, 60.0 / frequency)
+        if stamp - self.last_spoke < max(target_gap, self._unanswered_backoff):
             return None
 
         for rule, kind in self._candidates(now, balance, idle_seconds):
-            if not self._rule_ready(rule, stamp, False):
+            if not self._rule_ready(rule, stamp):
                 continue
             line = self._pick(kind, stamp)
             if not line:
@@ -130,14 +145,12 @@ class Chatter:
         candidates.append(("idle", "idle"))
         return candidates
 
-    def _rule_ready(self, rule: str, stamp: float, critical: bool) -> bool:
+    def _rule_ready(self, rule: str, stamp: float) -> bool:
         if rule in ("morning", "night", "lunch", "dinner"):
             if f"{rule}:{datetime.fromtimestamp(stamp).date()}" in self._once_keys:
                 return False
         gap = self.RULE_GAP.get(rule, 0)
-        if gap and stamp - self._rule_last.get(rule, 0) < gap:
-            return False
-        return True
+        return not gap or stamp - self._rule_last.get(rule, 0) >= gap
 
     def _pick(self, kind: str, stamp: float) -> str | None:
         pool = [line for line in LINES.get(kind, []) if stamp - self._recent.get(line, 0) > 24 * 3600]
